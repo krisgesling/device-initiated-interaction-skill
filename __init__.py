@@ -23,15 +23,20 @@ class DeviceInitiatedInteraction(MycroftSkill):
 
 
     def on_settings_changed(self):
+        """ Callback triggered when Skill settings are modified at 
+            home.mycroft.ai/skills """
         self.log.info("Trigger actions when settings are updated")
 
 
     @intent_handler('interaction.initiated.device.intent')
     def handle_interaction_initiated_device(self, message):
+        # Ensure any previously scheduled events are cancelled
         self.cancel_scheduled_event(self.proning_event)
         # Schedule the proning protocol every two hours, starting immediately
         # https://mycroft-core.readthedocs.io/en/latest/source/mycroft.html?highlight=schedule#mycroft.MycroftSkill.schedule_repeating_event
-        self.schedule_repeating_event(self.proning_protocol, datetime.now(), 2 * HOURS, name=self.proning_event)
+        self.schedule_repeating_event(self.proning_protocol, 
+                                      datetime.now(), 2 * HOURS, 
+                                      name=self.proning_event)
         self.speak_dialog('interaction.initiated.device')
 
     
@@ -42,6 +47,7 @@ class DeviceInitiatedInteraction(MycroftSkill):
         # Pause an additional period for patient to complete step
         sleep(10)
 
+        # This method checks for a range of standard yes/no responses eg "yeah"
         response = self.ask_yesno('confirm')
         if response == 'yes':
             self.speak_dialog('step.two')
@@ -53,11 +59,15 @@ class DeviceInitiatedInteraction(MycroftSkill):
 
 
     def check_on_patient(self):
+        # Ask user a question and record the response. 
+        # Can also validate response and provide guidance if it fails validation
+        # https://mycroft-core.readthedocs.io/en/latest/source/mycroft.html#mycroft.MycroftSkill.get_response
         response = self.get_response('get.feedback')
         self.send_patient_response(response)
 
 
     def send_patient_response(self, response):
+        # Standard POST request
         data = { 'api_key': API_KEY, 'patient_response':response } 
         r = requests.post( url=API_ENDPOINT, data=data ) 
         self.log.info("Sent feedback: {}".format(response))
@@ -69,6 +79,8 @@ class DeviceInitiatedInteraction(MycroftSkill):
         # https://mycroft-core.readthedocs.io/en/latest/source/mycroft.html?highlight=get%20event#mycroft.MycroftSkill.get_scheduled_event_status
         secs_remaining = self.get_scheduled_event_status(self.proning_event) 
         if secs_remaining:
+            # nice_duration formats our time remaining into a speakable format
+            # the resolution rounds this to the nearest minute
             self.speak_dialog('time.remaining', 
                               { 'duration': nice_duration(secs_remaining, 
                                 resolution=TimeResolution.MINUTES) })
